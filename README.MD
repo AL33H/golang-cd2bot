@@ -1,0 +1,1 @@
+## command to start go run .\main.go -t token
