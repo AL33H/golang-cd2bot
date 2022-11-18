@@ -39,7 +39,9 @@ func main() {
 		return
 	}
 	dg.AddHandler(messageCreate)
-	dg.Identify.Intents = discordgo.IntentsGuildMessages
+	dg.AddHandler(interaction)
+	dg.AddHandler(ready)
+	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMessageReactions | discordgo.IntentGuildEmojis
 
 	err = dg.Open()
 	if err != nil {
@@ -55,13 +57,49 @@ func main() {
 	dg.Close()
 }
 
+func interaction(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Comando inválido! interacttion")
+		}
+	}()
+
+	msg, _ := s.ChannelMessage(m.ChannelID, m.MessageID)
+
+	if len(msg.Embeds) == 0 || m.UserID == "1041368492655530065" {
+		return
+	}
+
+	if m.Emoji.Name == "✅" {
+		msg.Embeds[0].Color = 0x40cf1d
+		s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, msg.Embeds[0])
+	}
+
+	if m.Emoji.Name == "❌" {
+		msg.Embeds[0].Color = 0xd61a1a
+		s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, msg.Embeds[0])
+	}
+}
+
+func ready(s *discordgo.Session, event *discordgo.Ready) {
+	s.UpdateGameStatus(1, "Pessoas fazem tudo!")
+}
+
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	defer func() {
+		if r := recover(); r != nil {
+			userChat, err := s.UserChannelCreate(m.Author.ID)
+			if err == nil {
+				s.ChannelMessageSend(userChat.ID, "A mensagem \""+m.Content+"\" fere algum padrão encontrado na implementação. Por favor, necessário ajuste para continuar!")
+			}
+		}
+	}()
 
 	if strings.Contains(m.Content, "!mrassai") {
 		msg := extractInfoMessageAssai(m)
 		embeded := generateEmbedAssai(m, msg)
 		messageCreate, _ := s.ChannelMessageSendEmbed(chatAssai, embeded)
-
+		fmt.Println(&messageCreate)
 		s.MessageReactionAdd(messageCreate.ChannelID, messageCreate.ID, "✅")
 		s.MessageReactionAdd(messageCreate.ChannelID, messageCreate.ID, "❌")
 	}
@@ -75,8 +113,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.MessageReactionAdd(messageCreate.ChannelID, messageCreate.ID, "❌")
 	}
 
-	if m.Content == "pong" {
-		s.ChannelMessageSend(m.ChannelID, "Ping!")
+	if m.Content == "!help assai" {
+		s.ChannelMessageSend(m.ChannelID, "O Padrão de solicitação é \"!mrassai ambiente linkMr nomebranch\"")
+	}
+
+	if m.Content == "!help hippo" {
+		s.ChannelMessageSend(m.ChannelID, "O Padrão de solicitação é \"!mrahippo ambiente linkMr nomebranch\"")
 	}
 }
 
@@ -100,6 +142,7 @@ func extractInfoMessageAssai(m *discordgo.MessageCreate) mensagem {
 }
 
 func extractInfoMessageHippo(m *discordgo.MessageCreate) mensagem {
+
 	splitedContent := strings.Split(m.Content, " ")
 	urlMr := strings.Split(splitedContent[2], "/")
 	urlBranch := strings.Split(splitedContent[3], "/")
@@ -107,26 +150,27 @@ func extractInfoMessageHippo(m *discordgo.MessageCreate) mensagem {
 	msg := mensagem{
 		ambiente:  splitedContent[1],
 		url:       splitedContent[2],
-		projeto:   urlMr[5],
+		projeto:   urlMr[4],
 		branch:    splitedContent[3],
-		descricao: urlBranch[2],
+		descricao: urlBranch[1],
 	}
 
 	return msg
 }
 
 func generateEmbedAssai(m *discordgo.MessageCreate, msg mensagem) *discordgo.MessageEmbed {
-	embeded := embed.NewGenericEmbed("Solicitação de MR ", m.Author.Username+" ~ "+time.Now().Format(time.RFC822))
+
+	embeded := embed.NewGenericEmbed("Solicitação de MR ", m.Author.Username+" ~ "+time.Now().Format("02/01/2006  15:04"))
 	embeded.Color = 0xe6cd53
 	embeded.URL = msg.url
 	embeded.Fields = append(embeded.Fields,
-		&discordgo.MessageEmbedField{Name: "AMBIENTE", Value: msg.ambiente, Inline: true},
-		&discordgo.MessageEmbedField{Name: "MR", Value: msg.numeroMr, Inline: true},
-		&discordgo.MessageEmbedField{Name: "PROJETO", Value: msg.projeto, Inline: true},
-		&discordgo.MessageEmbedField{Name: "TIPO", Value: msg.formatModification, Inline: true},
-		&discordgo.MessageEmbedField{Name: "ATIVIDADE", Value: msg.atividadeId, Inline: true},
-		&discordgo.MessageEmbedField{Name: "DESCRICAO", Value: msg.descricao, Inline: true},
-		&discordgo.MessageEmbedField{Name: "BRANCH", Value: msg.branch, Inline: true},
+		&discordgo.MessageEmbedField{Name: "AMBIENTE", Value: msg.ambiente, Inline: false},
+		&discordgo.MessageEmbedField{Name: "MR", Value: msg.numeroMr, Inline: false},
+		&discordgo.MessageEmbedField{Name: "PROJETO", Value: msg.projeto, Inline: false},
+		&discordgo.MessageEmbedField{Name: "TIPO", Value: msg.formatModification, Inline: false},
+		&discordgo.MessageEmbedField{Name: "ATIVIDADE", Value: msg.atividadeId, Inline: false},
+		&discordgo.MessageEmbedField{Name: "DESCRICAO", Value: msg.descricao, Inline: false},
+		&discordgo.MessageEmbedField{Name: "BRANCH", Value: msg.branch, Inline: false},
 		&discordgo.MessageEmbedField{Name: "URL", Value: msg.url, Inline: false})
 	embeded.Image = &discordgo.MessageEmbedImage{URL: "https://media-exp1.licdn.com/dms/image/C4D0BAQGXoqfzgYQxuw/company-logo_200_200/0/1647390907682?e=1676505600&v=beta&t=DSlD-Bm6O3VSBwSsxeVziWYLu2GUddKnHPmqckZO1s0",
 		Height: 50, Width: 100}
@@ -136,14 +180,14 @@ func generateEmbedAssai(m *discordgo.MessageCreate, msg mensagem) *discordgo.Mes
 
 func generateEmbedHippo(m *discordgo.MessageCreate, msg mensagem) *discordgo.MessageEmbed {
 
-	embeded := embed.NewGenericEmbed("Solicitação de MR ", m.Author.Username+" ~ "+time.Now().Format(time.RFC822))
+	embeded := embed.NewGenericEmbed("Solicitação de MR ", m.Author.Username+" ~ "+time.Now().Format("02/01/2006  15:04"))
 	embeded.Color = 0xe6cd53
 	embeded.URL = msg.url
 	embeded.Fields = append(embeded.Fields,
-		&discordgo.MessageEmbedField{Name: "AMBIENTE", Value: msg.ambiente, Inline: true},
-		&discordgo.MessageEmbedField{Name: "PROJETO", Value: msg.projeto, Inline: true},
-		&discordgo.MessageEmbedField{Name: "DESCRICAO", Value: msg.descricao, Inline: true},
-		&discordgo.MessageEmbedField{Name: "BRANCH", Value: msg.branch, Inline: true},
+		&discordgo.MessageEmbedField{Name: "AMBIENTE", Value: msg.ambiente, Inline: false},
+		&discordgo.MessageEmbedField{Name: "PROJETO", Value: msg.projeto, Inline: false},
+		&discordgo.MessageEmbedField{Name: "DESCRICAO", Value: msg.descricao, Inline: false},
+		&discordgo.MessageEmbedField{Name: "BRANCH", Value: msg.branch, Inline: false},
 		&discordgo.MessageEmbedField{Name: "URL", Value: msg.url, Inline: false})
 	embeded.Image = &discordgo.MessageEmbedImage{URL: "https://media-exp1.licdn.com/dms/image/C4D0BAQGXoqfzgYQxuw/company-logo_200_200/0/1647390907682?e=1676505600&v=beta&t=DSlD-Bm6O3VSBwSsxeVziWYLu2GUddKnHPmqckZO1s0",
 		Height: 50, Width: 100}
